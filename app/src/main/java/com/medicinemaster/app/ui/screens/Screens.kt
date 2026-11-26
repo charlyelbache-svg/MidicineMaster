@@ -1,7 +1,10 @@
 package com.medicinemaster.app.ui.screens
 
-import androidx.compose.foundation.background
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,16 +37,17 @@ import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Quiz
 import androidx.compose.material.icons.outlined.Science
-import androidx.compose.material.icons.outlined.SettingsVoice
 import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.SettingsVoice
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -52,15 +56,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.medicinemaster.app.data.ProgressStore
+import com.medicinemaster.app.data.QuestionBank
+import com.medicinemaster.app.data.StudyQuestion
+import com.medicinemaster.app.data.StudySubject
+import com.medicinemaster.app.data.StudySubjects
 
 private val CardShape = RoundedCornerShape(22.dp)
 
@@ -77,20 +87,10 @@ private fun ScreenFrame(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun ScreenTitle(
-    title: String,
-    subtitle: String,
-    trailing: (@Composable () -> Unit)? = null
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        trailing?.invoke()
+private fun ScreenTitle(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -114,29 +114,18 @@ private fun SectionLabel(text: String, action: String? = null, onAction: (() -> 
 }
 
 @Composable
-private fun IconTile(icon: ImageVector, tint: Color = MaterialTheme.colorScheme.primary) {
-    Surface(
-        shape = RoundedCornerShape(15.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.size(48.dp)
-    ) {
+private fun IconTile(icon: ImageVector) {
+    Surface(shape = RoundedCornerShape(15.dp), color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.size(48.dp)) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+            androidx.compose.material3.Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
         }
     }
 }
 
 @Composable
-private fun ActionTile(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
-) {
+private fun ActionTile(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -150,7 +139,7 @@ private fun ActionTile(
                 Text(title, fontWeight = FontWeight.SemiBold)
                 Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
-            Icon(Icons.Outlined.ChevronRight, contentDescription = "Abrir", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            androidx.compose.material3.Icon(Icons.Outlined.ChevronRight, contentDescription = "Abrir", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -165,7 +154,7 @@ fun HomeScreen(
     ScreenFrame {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primary) {
-                Icon(
+                androidx.compose.material3.Icon(
                     Icons.Outlined.MonitorHeart,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimary,
@@ -177,61 +166,50 @@ fun HomeScreen(
                 Text("MEDICINE MASTER", fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp, fontSize = 15.sp)
                 Text("Tu entrenamiento médico", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
             }
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.clickable(onClick = onOpenSettings)
-            ) {
-                Icon(Icons.Outlined.SettingsVoice, contentDescription = "Configuración", modifier = Modifier.padding(11.dp))
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.clickable(onClick = onOpenSettings)) {
+                androidx.compose.material3.Icon(Icons.Outlined.SettingsVoice, contentDescription = "Configuración", modifier = Modifier.padding(11.dp))
             }
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Text("Aprende. Recuerda.\nDemuestra lo que sabes.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, lineHeight = 36.sp)
-            Text("Medicina explicada sin rodeos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("36 preguntas iniciales con explicaciones y fuentes de estudio.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
-        Card(
-            shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
+        Card(shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
-                        Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp))
+                        androidx.compose.material3.Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp))
                     }
                     Spacer(Modifier.width(9.dp))
                     Text("TU PRÓXIMA SESIÓN", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 }
                 Text("Empieza por lo esencial", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("Elige una materia y pon a prueba tus conocimientos con preguntas médicas.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                Button(
-                    onClick = onOpenStudy,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(15.dp)
-                ) {
-                    Icon(Icons.Outlined.Book, contentDescription = null)
+                Text("Selecciona una materia, un tema y una dificultad. La aplicación corregirá cada respuesta y explicará el concepto.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = onOpenStudy, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(15.dp)) {
+                    androidx.compose.material3.Icon(Icons.Outlined.Book, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Comenzar a estudiar", fontWeight = FontWeight.Bold)
                     Spacer(Modifier.weight(1f))
-                    Icon(Icons.Outlined.ArrowForward, contentDescription = null)
+                    androidx.compose.material3.Icon(Icons.Outlined.ArrowForward, contentDescription = null)
                 }
             }
         }
 
         SectionLabel("Explora la aplicación")
         Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            ActionTile(Icons.Outlined.MenuBook, "Materias", "Anatomía, fisiología, farmacología y más", onOpenSubjects)
-            ActionTile(Icons.Outlined.Quiz, "Modo examen", "Simulaciones y evaluación por temas", onOpenStudy)
-            ActionTile(Icons.Outlined.TrendingUp, "Mi progreso", "Consulta tus resultados y evolución", onOpenProgress)
+            ActionTile(Icons.Outlined.MenuBook, "Materias", "Seis asignaturas con preguntas iniciales", onOpenSubjects)
+            ActionTile(Icons.Outlined.Quiz, "Sesión de estudio", "Practica y recibe explicaciones", onOpenStudy)
+            ActionTile(Icons.Outlined.TrendingUp, "Mi progreso", "Consulta tus sesiones y aciertos", onOpenProgress)
         }
 
         Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(18.dp)) {
             Row(modifier = Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                androidx.compose.material3.Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    "Versión inicial: estamos preparando el banco de preguntas, la voz y el evaluador inteligente.",
+                    "Contenido formativo inicial. Contrasta siempre el material con la bibliografía de tu programa académico.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -240,168 +218,310 @@ fun HomeScreen(
     }
 }
 
-private data class SubjectItem(
-    val title: String,
-    val detail: String,
-    val icon: ImageVector,
-    val topics: String
-)
-
 @Composable
-fun SubjectsScreen(onStartSubject: () -> Unit) {
-    val subjects = listOf(
-        SubjectItem("Anatomía", "Estructuras y órganos del cuerpo", Icons.Outlined.MonitorHeart, "12 temas iniciales"),
-        SubjectItem("Fisiología", "Funciones y mecanismos del organismo", Icons.Outlined.FavoriteBorder, "10 temas iniciales"),
-        SubjectItem("Farmacología", "Medicamentos y sus mecanismos", Icons.Outlined.Science, "Próximamente"),
-        SubjectItem("Patología", "Alteraciones y procesos de enfermedad", Icons.Outlined.Biotech, "Próximamente"),
-        SubjectItem("Microbiología", "Bacterias, virus, hongos y parásitos", Icons.Outlined.Psychology, "Próximamente"),
-        SubjectItem("Bioquímica", "Procesos químicos de la vida", Icons.Outlined.School, "Próximamente")
-    )
-
+fun SubjectsScreen(onStartSubject: (String) -> Unit) {
     ScreenFrame {
         ScreenTitle("Materias", "Elige el área que quieres dominar.")
         Surface(shape = CardShape, color = MaterialTheme.colorScheme.surfaceVariant) {
             Row(modifier = Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.MenuBook, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(25.dp), contentDescription = null)
+                androidx.compose.material3.Icon(Icons.Outlined.MenuBook, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(25.dp), contentDescription = null)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text("Biblioteca de estudio", fontWeight = FontWeight.SemiBold)
-                    Text("Las asignaturas se irán ampliando por bloques revisados.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    Text("Cada pregunta incluye respuesta, explicación y referencia.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
-        subjects.forEach { subject ->
-            Card(
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onStartSubject),
-                shape = CardShape,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconTile(subject.icon)
-                    Spacer(Modifier.width(13.dp))
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(subject.title, fontWeight = FontWeight.Bold)
-                        Text(subject.detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        Text(subject.topics, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
-                    }
-                    Icon(Icons.Outlined.ChevronRight, contentDescription = "Abrir materia", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+        StudySubjects.all.forEach { subject ->
+            SubjectCard(subject = subject, onClick = { onStartSubject(subject.id) })
         }
     }
 }
 
 @Composable
-fun StudyScreen() {
-    var selectedAnswer by remember { mutableStateOf<String?>(null) }
-    var showPreview by remember { mutableStateOf(false) }
-    val answers = listOf("Hígado", "Vesícula biliar", "Páncreas", "Estómago")
+private fun SubjectCard(subject: StudySubject, onClick: () -> Unit) {
+    val icon = when (subject.id) {
+        StudySubjects.ANATOMY -> Icons.Outlined.MonitorHeart
+        StudySubjects.PHYSIOLOGY -> Icons.Outlined.FavoriteBorder
+        StudySubjects.PHARMACOLOGY -> Icons.Outlined.Science
+        StudySubjects.PATHOLOGY -> Icons.Outlined.Biotech
+        StudySubjects.MICROBIOLOGY -> Icons.Outlined.Psychology
+        else -> Icons.Outlined.School
+    }
+    val count = QuestionBank.subjectCount(subject.id)
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = CardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconTile(icon)
+            Spacer(Modifier.width(13.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(subject.name, fontWeight = FontWeight.Bold)
+                Text(subject.description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                Text("$count preguntas disponibles", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+            }
+            androidx.compose.material3.Icon(Icons.Outlined.ChevronRight, contentDescription = "Estudiar ${subject.name}", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+fun StudyScreen(initialSubjectId: String = "all") {
+    val context = LocalContext.current
+    var selectedSubject by rememberSaveable(initialSubjectId) { mutableStateOf(initialSubjectId) }
+    var selectedTopic by rememberSaveable(initialSubjectId) { mutableStateOf("Todos los temas") }
+    var selectedDifficulty by rememberSaveable { mutableStateOf("Todas") }
+    var selectedCount by rememberSaveable { mutableStateOf(10) }
+    var sessionQuestions by remember { mutableStateOf<List<StudyQuestion>>(emptyList()) }
+    var questionIndex by rememberSaveable { mutableStateOf(0) }
+    var selectedOption by remember { mutableStateOf<Int?>(null) }
+    var submitted by rememberSaveable { mutableStateOf(false) }
+    var correctCount by rememberSaveable { mutableStateOf(0) }
+    var completed by rememberSaveable { mutableStateOf(false) }
+    var statsSaved by rememberSaveable { mutableStateOf(false) }
+
+    val matchingQuestions = QuestionBank.forFilters(selectedSubject, selectedTopic, selectedDifficulty)
+    val availableTopics = listOf("Todos los temas") + QuestionBank.topicsFor(selectedSubject)
+
+    fun resetToSetup() {
+        sessionQuestions = emptyList()
+        questionIndex = 0
+        selectedOption = null
+        submitted = false
+        correctCount = 0
+        completed = false
+        statsSaved = false
+    }
 
     ScreenFrame {
-        ScreenTitle("Sesión de estudio", "Anatomía · Sistema digestivo")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(30.dp)) {
-                Text("PREGUNTA DE EJEMPLO", modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        if (sessionQuestions.isEmpty()) {
+            ScreenTitle("Preparar sesión", "Personaliza tu práctica antes de empezar.")
+            SectionLabel("1. Asignatura")
+            Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = selectedSubject == "all", onClick = { selectedSubject = "all"; selectedTopic = "Todos los temas" }, label = { Text("Todas") })
+                StudySubjects.all.forEach { subject ->
+                    FilterChip(selected = selectedSubject == subject.id, onClick = { selectedSubject = subject.id; selectedTopic = "Todos los temas" }, label = { Text(subject.name) })
+                }
             }
-            Text("01 / 10", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-        }
-        Card(shape = RoundedCornerShape(25.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
-                Text("¿Qué órgano produce la bilis?", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Selecciona una respuesta para visualizar el diseño del cuestionario.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                answers.forEachIndexed { index, answer ->
-                    val isSelected = selectedAnswer == answer
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            selectedAnswer = answer
-                            showPreview = false
+
+            SectionLabel("2. Tema")
+            Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                availableTopics.forEach { topic ->
+                    FilterChip(selected = selectedTopic == topic, onClick = { selectedTopic = topic }, label = { Text(topic) })
+                }
+            }
+
+            SectionLabel("3. Dificultad")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("Todas", "Básica", "Intermedia", "Avanzada").forEach { difficulty ->
+                    FilterChip(selected = selectedDifficulty == difficulty, onClick = { selectedDifficulty = difficulty }, label = { Text(difficulty) })
+                }
+            }
+
+            SectionLabel("4. Número de preguntas")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(5, 10, 15, 20).forEach { amount ->
+                    FilterChip(selected = selectedCount == amount, onClick = { selectedCount = amount }, label = { Text(amount.toString()) })
+                }
+            }
+
+            Card(shape = CardShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(modifier = Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Preguntas disponibles: ${matchingQuestions.size}", fontWeight = FontWeight.Bold)
+                    Text(
+                        "La sesión elegirá hasta ${minOf(selectedCount, matchingQuestions.size)} preguntas sin repetirlas dentro de esta sesión.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Button(
+                        onClick = {
+                            sessionQuestions = matchingQuestions.shuffled().take(selectedCount.coerceAtMost(matchingQuestions.size))
+                            questionIndex = 0
+                            selectedOption = null
+                            submitted = false
+                            correctCount = 0
+                            completed = false
+                            statsSaved = false
                         },
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
-                        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+                        enabled = matchingQuestions.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(15.dp)
                     ) {
-                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${'A' + index}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.width(13.dp))
-                            Text(answer, modifier = Modifier.weight(1f), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                            if (isSelected) Icon(Icons.Outlined.CheckCircle, contentDescription = "Seleccionada", tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
-                Button(
-                    onClick = { showPreview = true },
-                    enabled = selectedAnswer != null,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text("Ver ejemplo de corrección")
-                }
-                if (showPreview) {
-                    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp)) {
-                        Column(modifier = Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                            Text("VISTA PREVIA · NO ES EL EVALUADOR REAL", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                            Text("Respuesta correcta: hígado", fontWeight = FontWeight.Bold)
-                            Text(
-                                if (selectedAnswer == "Hígado") "¡Correcto! El hígado produce la bilis. La vesícula se encarga de almacenarla." else "No exactamente. El hígado produce la bilis; la vesícula biliar la almacena.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text("La evaluación automática y los comentarios del profesor se incorporarán en fases posteriores.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
+                        androidx.compose.material3.Icon(Icons.Outlined.Book, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Iniciar sesión", fontWeight = FontWeight.Bold)
                     }
                 }
             }
-        }
-        Card(shape = CardShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-            Row(modifier = Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
-                    Icon(Icons.Outlined.Mic, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(11.dp))
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Responde con tu voz", fontWeight = FontWeight.SemiBold)
-                    Text("El micrófono y la narración se activarán en las fases 3 y 4.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            if (matchingQuestions.isEmpty()) {
+                Text("No hay preguntas para esta combinación. Cambia el tema o la dificultad.", color = MaterialTheme.colorScheme.error)
+            }
+        } else if (completed) {
+            val total = sessionQuestions.size
+            val percent = if (total == 0) 0 else (correctCount * 100 / total)
+            ScreenTitle("Sesión completada", "Terminaste las preguntas seleccionadas.")
+            Card(shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    androidx.compose.material3.Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                    Text("$percent%", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold)
+                    Text("$correctCount aciertos de $total preguntas", fontWeight = FontWeight.SemiBold)
+                    Text("${total - correctCount} respuestas incorrectas", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LinearProgressIndicator(progress = if (total == 0) 0f else correctCount.toFloat() / total, modifier = Modifier.fillMaxWidth().height(8.dp))
                 }
             }
-        }
-        OutlinedButton(onClick = { selectedAnswer = null; showPreview = false }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-            Text("Reiniciar ejemplo")
+            if (statsSaved) {
+                Text("Resultado guardado en este dispositivo.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
+            }
+            Button(onClick = { resetToSetup() }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
+                Text("Preparar otra sesión")
+            }
+        } else {
+            val question = sessionQuestions[questionIndex]
+            val total = sessionQuestions.size
+            ScreenTitle("Sesión de estudio", "${question.subjectName} · ${question.topic}")
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("PREGUNTA ${questionIndex + 1} DE $total", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Text("Aciertos: $correctCount", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+            }
+            LinearProgressIndicator(progress = (questionIndex + 1).toFloat() / total, modifier = Modifier.fillMaxWidth().height(6.dp))
+
+            Card(shape = RoundedCornerShape(25.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(shape = RoundedCornerShape(30.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
+                            Text(question.difficulty.uppercase(), modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        }
+                        Text(question.topic, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                    }
+                    Text(question.prompt, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    question.options.forEachIndexed { index, answer ->
+                        val isSelected = selectedOption == index
+                        val isCorrectOption = submitted && index == question.correctIndex
+                        val isWrongSelection = submitted && isSelected && index != question.correctIndex
+                        val bg = when {
+                            isCorrectOption -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                            isWrongSelection -> MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
+                            isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
+                        val border = when {
+                            isCorrectOption -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                            isWrongSelection -> BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                            isSelected -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                            else -> null
+                        }
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable(enabled = !submitted) { selectedOption = index },
+                            shape = RoundedCornerShape(14.dp),
+                            color = bg,
+                            border = border
+                        ) {
+                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("${'A' + index}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(13.dp))
+                                Text(answer, modifier = Modifier.weight(1f), fontWeight = if (isSelected || isCorrectOption) FontWeight.Bold else FontWeight.Normal)
+                                if (isCorrectOption) Text("✓", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
+                                else if (isWrongSelection) Text("✕", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                    }
+
+                    if (submitted) {
+                        val answerWasCorrect = selectedOption == question.correctIndex
+                        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp)) {
+                            Column(modifier = Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    if (answerWasCorrect) "RESPUESTA CORRECTA" else "RESPUESTA INCORRECTA",
+                                    color = if (answerWasCorrect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text("Respuesta: ${question.options[question.correctIndex]}", fontWeight = FontWeight.Bold)
+                                Text(question.explanation, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    "Fuente: ${question.sourceLabel} · abrir referencia",
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.clickable {
+                                        runCatching {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(question.sourceUrl)))
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (!submitted) {
+                        Button(
+                            onClick = {
+                                submitted = true
+                                if (selectedOption == question.correctIndex) correctCount += 1
+                            },
+                            enabled = selectedOption != null,
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(14.dp)
+                        ) { Text("Comprobar respuesta") }
+                    } else {
+                        Button(
+                            onClick = {
+                                if (questionIndex < total - 1) {
+                                    questionIndex += 1
+                                    selectedOption = null
+                                    submitted = false
+                                } else {
+                                    completed = true
+                                    if (!statsSaved) {
+                                        ProgressStore.recordSession(context, total, correctCount)
+                                        statsSaved = true
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(14.dp)
+                        ) { Text(if (questionIndex < total - 1) "Siguiente pregunta" else "Ver resultados") }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
 fun ProgressScreen() {
+    val context = LocalContext.current
+    val stats = ProgressStore.load(context)
+
     ScreenFrame {
-        ScreenTitle("Mi progreso", "Tu evolución, basada en sesiones reales.")
+        ScreenTitle("Mi progreso", "Resultados guardados en este dispositivo.")
         Card(shape = RoundedCornerShape(25.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
             Column(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Outlined.TrendingUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(38.dp))
-                Text("Tu historial comienza aquí", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("Todavía no hay sesiones registradas. Cuando el sistema de estudio esté conectado, aquí verás tus resultados reales.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                androidx.compose.material3.Icon(Icons.Outlined.TrendingUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(38.dp))
+                Text("${stats.accuracyPercent}%", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold)
+                Text("Porcentaje global de aciertos", fontWeight = FontWeight.SemiBold)
+                Text("Se calcula con todas las respuestas de sesiones terminadas.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatPlaceholder("0", "Sesiones", Icons.Outlined.MenuBook, Modifier.weight(1f))
-            StatPlaceholder("0%", "Aciertos", Icons.Outlined.CheckCircle, Modifier.weight(1f))
-            StatPlaceholder("0", "Racha", Icons.Outlined.Timer, Modifier.weight(1f))
+            StatCard(stats.sessions.toString(), "Sesiones", Icons.Outlined.MenuBook, Modifier.weight(1f))
+            StatCard(stats.answered.toString(), "Preguntas", Icons.Outlined.Quiz, Modifier.weight(1f))
+            StatCard(stats.correct.toString(), "Aciertos", Icons.Outlined.CheckCircle, Modifier.weight(1f))
         }
-        SectionLabel("Próximamente")
-        listOf("Dominio por asignatura", "Errores más frecuentes", "Tiempo de estudio", "Evolución semanal").forEach {
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
-                Spacer(Modifier.width(10.dp))
-                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (stats.answered == 0) {
+            Surface(color = MaterialTheme.colorScheme.surface, shape = CardShape) {
+                Text("Todavía no hay resultados. Completa una sesión y tus estadísticas aparecerán aquí.", modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
 }
 
 @Composable
-private fun StatPlaceholder(value: String, label: String, icon: ImageVector, modifier: Modifier = Modifier) {
+private fun StatCard(value: String, label: String, icon: ImageVector, modifier: Modifier = Modifier) {
     Card(modifier = modifier, shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(vertical = 15.dp, horizontal = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            androidx.compose.material3.Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Text(value, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
             Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -412,19 +532,19 @@ private fun StatPlaceholder(value: String, label: String, icon: ImageVector, mod
 fun SettingsScreen() {
     ScreenFrame {
         ScreenTitle("Configuración", "Prepara tu experiencia de estudio.")
-        SettingsRow(Icons.Outlined.Headphones, "Narración de preguntas", "Voces y velocidad: disponibles en Fase 3")
+        SettingsRow(Icons.Outlined.Headphones, "Narración de preguntas", "Se implementará en la Fase 3")
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        SettingsRow(Icons.Outlined.Mic, "Reconocimiento de voz", "Entrada hablada: disponible en Fase 4")
+        SettingsRow(Icons.Outlined.Mic, "Reconocimiento de voz", "Entrada hablada: Fase 4")
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        SettingsRow(Icons.Outlined.AutoAwesome, "Personalidad del profesor", "Nivel de humor y sarcasmo: disponible en Fase 6")
+        SettingsRow(Icons.Outlined.AutoAwesome, "Personalidad del profesor", "Humor y correcciones contextuales: Fase 6")
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        SettingsRow(Icons.Outlined.School, "Nivel académico", "Se configurará con el sistema de materias")
+        SettingsRow(Icons.Outlined.School, "Nivel académico", "El banco inicial contiene preguntas básicas, intermedias y avanzadas")
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        SettingsRow(Icons.Outlined.Info, "Acerca de", "Medicine Master · versión 0.1.0")
+        SettingsRow(Icons.Outlined.Info, "Acerca de", "Medicine Master · versión 0.2.0")
         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = CardShape) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Importante", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
-                Text("Esta aplicación es una herramienta educativa. Su contenido médico deberá revisarse con bibliografía fiable y no sustituye la formación clínica ni el criterio profesional.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                Text("Esta aplicación es una herramienta educativa. El contenido inicial incluye referencias bibliográficas para revisión; no sustituye la formación clínica ni el criterio profesional.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
