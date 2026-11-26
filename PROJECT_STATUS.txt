@@ -1,0 +1,14 @@
+MEDICINE MASTER — FASE 1
+
+Entregado:
+- Kotlin + Jetpack Compose project scaffold
+- 5 destinos de navegación
+- Inicio, materias, estudio (demo), progreso, ajustes
+- Tema de interfaz y componentes reutilizables
+- GitHub Actions workflow para APK debug
+
+Pendiente:
+- Construcción verificada en runner Android (requiere ejecutar el workflow en GitHub)
+- Voz, reconocimiento, evaluación real, banco médico completo e IA
+
+La app todavía no incorpora narración ni reconocimiento de voz en esta fase.
