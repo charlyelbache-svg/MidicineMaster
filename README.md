@@ -1,55 +1,51 @@
-# Medicine Master — Fase 1
+# Medicine Master — Fase 2
 
-Aplicación Android educativa para estudiar medicina. Esta entrega contiene el esqueleto real del proyecto, la navegación principal y las primeras pantallas de interfaz en Kotlin + Jetpack Compose.
+Aplicación Android educativa para estudiar medicina. Esta entrega parte de la estructura funcional de la Fase 1 y añade un motor de preguntas de opción múltiple, selección de materias/temas/dificultad, sesiones de estudio, explicaciones y estadísticas locales.
 
-## Estado de esta entrega
+## Incluido en Fase 2
 
-**Incluido**
-- Proyecto Android con Kotlin y Jetpack Compose.
-- Navegación funcional entre Inicio, Materias, Estudiar, Progreso y Ajustes.
-- Diseño inicial oscuro con componentes reutilizables.
-- Pantalla de materias con asignaturas iniciales.
-- Pantalla de estudio con una pregunta de demostración y una previsualización de corrección.
-- Pantallas de progreso y configuración preparadas para las próximas fases.
-- Workflow de GitHub Actions para compilar y publicar el APK debug como artefacto.
+- Seis asignaturas: Anatomía, Fisiología, Farmacología, Patología, Microbiología y Bioquímica.
+- 36 preguntas iniciales, seis por asignatura.
+- Cuatro opciones por pregunta, respuesta correcta y explicación.
+- Dificultades Básica, Intermedia y Avanzada.
+- Filtros por asignatura, tema y dificultad.
+- Sesiones de 5, 10, 15 o 20 preguntas, sin repetir preguntas dentro de una sesión.
+- Corrección inmediata y explicación después de responder.
+- Pantalla de resultados al finalizar.
+- Estadísticas globales persistentes en el dispositivo mediante SharedPreferences.
+- Referencia bibliográfica asociada a cada pregunta y listado en `REFERENCIAS_MEDICAS.md`.
+- Proyecto Android, navegación y workflow de GitHub Actions para compilar una APK debug.
 
-**Todavía no incluido**
-- Narración real de preguntas (Fase 3).
+## Todavía no incluido
+
+- Narración Text-to-Speech (Fase 3).
 - Reconocimiento de voz (Fase 4).
-- Motor definitivo de corrección y sinónimos (Fase 5).
-- Profesor con humor contextual e IA (Fases 6 y 7).
-- Base de datos y estadísticas persistentes (se incorporarán cuando se implemente el motor de aprendizaje).
+- Evaluación de respuestas habladas abiertas y sinónimos (Fase 5).
+- Profesor con comentarios dinámicos y humor contextual (Fase 6).
+- IA conversacional (Fase 7).
+- Repetición espaciada y plan adaptativo avanzado (Fase 8).
 
-La pregunta de bilis que aparece en la pantalla de estudio es una demostración de interfaz, no una evaluación médica automatizada.
+## Tecnologías
 
-## Tecnologías y versiones
+- Kotlin y Jetpack Compose.
+- Android Gradle Plugin y Compose compiler plugin configurados en los archivos Gradle.
+- Java 17.
+- `minSdk`: 26.
+- `compileSdk`: 35.
+- `targetSdk`: 35.
+- Estadísticas locales con Android SharedPreferences; no requiere permisos ni conexión para estudiar.
 
-- Android Gradle Plugin: 9.5.0
-- Gradle: 9.6.0
-- Kotlin: 2.4.21 (AGP built-in Kotlin; Compose compiler plugin pins the KGP version)
-- Jetpack Compose BOM: 2026.11.01
-- Navigation Compose: 2.10.2
-- Java: 17
-- `minSdk`: 26
-- `compileSdk`: 37
-- `targetSdk`: 36
+## Cómo actualizar el repositorio desde el teléfono
 
-## Cómo obtener el APK desde el teléfono usando GitHub
+1. Descarga y descomprime el ZIP de Fase 2.
+2. Abre tu repositorio `MedicineMaster` en GitHub.
+3. Actualiza los archivos siguiendo la ruta indicada en el ZIP (conserva las carpetas).
+4. Verifica especialmente que existe `app/src/main/java/com/medicinemaster/app/data/StudyData.kt`.
+5. En **Actions**, ejecuta `Build Medicine Master APK`.
+6. Cuando el workflow termine en verde, descarga `MedicineMaster-debug-apk` e instala `app-debug.apk`.
 
-1. Descarga y descomprime `MedicineMaster-Fase1.zip`.
-2. En GitHub, crea un repositorio nuevo llamado `MedicineMaster`.
-3. Sube **el contenido de esta carpeta** a la raíz del repositorio. Deben quedar visibles `app`, `.github`, `build.gradle.kts` y `settings.gradle.kts` en la raíz.
-4. Abre la pestaña **Actions** del repositorio y habilita los workflows si GitHub lo solicita.
-5. Entra en **Build Medicine Master APK** y pulsa **Run workflow**. También se ejecuta automáticamente al subir cambios a `main` o `master`.
-6. Cuando termine en verde, abre la ejecución y descarga el artefacto `MedicineMaster-debug-apk`.
-7. Descomprime el artefacto y encontrarás `app-debug.apk`.
+El `versionCode` se incrementó a 2 y `versionName` a 0.2.0 para que Android identifique esta entrega como una actualización de la Fase 1.
 
-Si la compilación falla, abre el paso rojo de Actions y copia el primer error real (no solo el mensaje final). Ese error será el punto de partida para corregirlo.
+## Importante sobre el contenido
 
-## Abrir en Android Studio
-
-Abre la carpeta del proyecto desde Android Studio y deja que sincronice Gradle. El workflow incluido instala Gradle 9.6.0 por su cuenta, por lo que no depende de un `gradlew` generado localmente.
-
-## Próximo paso
-
-Fase 2: definir el modelo de datos y crear el banco inicial de preguntas por asignatura, tema, dificultad, respuesta aceptada, explicación y fuente bibliográfica.
+Las preguntas son de nivel introductorio y tienen fuentes identificadas, pero deben contrastarse con la bibliografía y el plan de estudios de la facultad antes de usarse como material oficial. La aplicación es educativa y no ofrece diagnóstico ni tratamiento.

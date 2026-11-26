@@ -1,14 +1,20 @@
-MEDICINE MASTER — FASE 1
+MEDICINE MASTER — FASE 2
 
-Entregado:
-- Kotlin + Jetpack Compose project scaffold
-- 5 destinos de navegación
-- Inicio, materias, estudio (demo), progreso, ajustes
-- Tema de interfaz y componentes reutilizables
-- GitHub Actions workflow para APK debug
+Implementado:
+- Banco inicial de 36 preguntas (6 materias x 6 preguntas)
+- Modelo de pregunta con opciones, respuesta correcta, dificultad, explicación y fuente
+- Filtros por asignatura, tema y dificultad
+- Sesiones aleatorias de 5, 10, 15 o 20 preguntas
+- Corrección de opción múltiple y explicación por respuesta
+- Pantalla de resultados al terminar
+- Estadísticas persistentes locales: sesiones, preguntas y aciertos
+- Navegación desde una asignatura a una sesión filtrada
+- Referencias médicas documentadas en REFERENCIAS_MEDICAS.md
+- versionCode 2 / versionName 0.2.0
 
 Pendiente:
-- Construcción verificada en runner Android (requiere ejecutar el workflow en GitHub)
-- Voz, reconocimiento, evaluación real, banco médico completo e IA
-
-La app todavía no incorpora narración ni reconocimiento de voz en esta fase.
+- Compilación real en GitHub Actions de esta entrega (debe ejecutarla el usuario)
+- Narración Text-to-Speech (Fase 3)
+- Reconocimiento de voz (Fase 4)
+- Evaluador de respuestas abiertas (Fase 5)
+- Personalidad dinámica e IA (Fases 6 y 7)
