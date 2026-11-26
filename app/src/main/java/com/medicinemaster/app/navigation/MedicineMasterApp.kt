@@ -19,6 +19,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -99,10 +101,18 @@ fun MedicineMasterApp() {
                 )
             }
             composable(Routes.SUBJECTS) {
-                SubjectsScreen(onStartSubject = { navController.navigate(Routes.STUDY) })
+                SubjectsScreen(onStartSubject = { subjectId ->
+                    navController.navigate("study/$subjectId")
+                })
             }
             composable(Routes.STUDY) {
                 StudyScreen()
+            }
+            composable(
+                route = Routes.STUDY_SUBJECT,
+                arguments = listOf(navArgument("subjectId") { type = NavType.StringType })
+            ) { entry ->
+                StudyScreen(initialSubjectId = entry.arguments?.getString("subjectId") ?: "all")
             }
             composable(Routes.PROGRESS) {
                 ProgressScreen()
