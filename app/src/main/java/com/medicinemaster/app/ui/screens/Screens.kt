@@ -52,7 +52,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +70,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.medicinemaster.app.audio.ProfessorVoice
+import com.medicinemaster.app.audio.VoicePreferences
+import com.medicinemaster.app.audio.VoicePreferencesStore
 import com.medicinemaster.app.data.ProgressStore
 import com.medicinemaster.app.data.QuestionBank
 import com.medicinemaster.app.data.StudyQuestion
@@ -173,7 +180,7 @@ fun HomeScreen(
 
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Text("Aprende. Recuerda.\nDemuestra lo que sabes.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, lineHeight = 36.sp)
-            Text("36 preguntas iniciales con explicaciones y fuentes de estudio.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("36 preguntas iniciales con explicaciones, fuentes y narración del profesor.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         Card(shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
@@ -270,6 +277,18 @@ private fun SubjectCard(subject: StudySubject, onClick: () -> Unit) {
 @Composable
 fun StudyScreen(initialSubjectId: String = "all") {
     val context = LocalContext.current
+    var voicePreferences by remember(context) { mutableStateOf(VoicePreferencesStore.load(context)) }
+    var voiceReady by remember { mutableStateOf(false) }
+    var voiceStatus by remember { mutableStateOf("Preparando el motor de voz de Android…") }
+    val professorVoice = remember(context) {
+        ProfessorVoice(context) { ready, message ->
+            voiceReady = ready
+            voiceStatus = message
+        }
+    }
+    DisposableEffect(professorVoice) {
+        onDispose { professorVoice.shutdown() }
+    }
     var selectedSubject by rememberSaveable(initialSubjectId) { mutableStateOf(initialSubjectId) }
     var selectedTopic by rememberSaveable(initialSubjectId) { mutableStateOf("Todos los temas") }
     var selectedDifficulty by rememberSaveable { mutableStateOf("Todas") }
@@ -284,8 +303,24 @@ fun StudyScreen(initialSubjectId: String = "all") {
 
     val matchingQuestions = QuestionBank.forFilters(selectedSubject, selectedTopic, selectedDifficulty)
     val availableTopics = listOf("Todos los temas") + QuestionBank.topicsFor(selectedSubject)
+    val questionBeingPresented = sessionQuestions.getOrNull(questionIndex)
+
+    LaunchedEffect(
+        questionBeingPresented?.id,
+        voiceReady,
+        voicePreferences.enabled,
+        voicePreferences.autoReadQuestions,
+        submitted
+    ) {
+        if (questionBeingPresented != null && !submitted && voiceReady &&
+            voicePreferences.enabled && voicePreferences.autoReadQuestions
+        ) {
+            professorVoice.speak(questionNarration(questionBeingPresented), voicePreferences)
+        }
+    }
 
     fun resetToSetup() {
+        professorVoice.stop()
         sessionQuestions = emptyList()
         questionIndex = 0
         selectedOption = null
@@ -386,6 +421,26 @@ fun StudyScreen(initialSubjectId: String = "all") {
                 Text("Aciertos: $correctCount", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
             }
             LinearProgressIndicator(progress = (questionIndex + 1).toFloat() / total, modifier = Modifier.fillMaxWidth().height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(
+                    onClick = { professorVoice.speak(questionNarration(question), voicePreferences) },
+                    enabled = voiceReady && voicePreferences.enabled,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(13.dp)
+                ) {
+                    androidx.compose.material3.Icon(Icons.Outlined.Headphones, contentDescription = null)
+                    Spacer(Modifier.width(7.dp))
+                    Text("Escuchar pregunta")
+                }
+                OutlinedButton(
+                    onClick = { professorVoice.stop() },
+                    enabled = voiceReady,
+                    shape = RoundedCornerShape(13.dp)
+                ) { Text("Detener") }
+            }
+            if (!voiceReady) {
+                Text(voiceStatus, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+            }
 
             Card(shape = RoundedCornerShape(25.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -440,6 +495,16 @@ fun StudyScreen(initialSubjectId: String = "all") {
                                 )
                                 Text("Respuesta: ${question.options[question.correctIndex]}", fontWeight = FontWeight.Bold)
                                 Text(question.explanation, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                                OutlinedButton(
+                                    onClick = { professorVoice.speak(explanationNarration(question, answerWasCorrect), voicePreferences) },
+                                    enabled = voiceReady && voicePreferences.enabled,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    androidx.compose.material3.Icon(Icons.Outlined.Headphones, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Escuchar explicación del profesor")
+                                }
                                 Text(
                                     "Fuente: ${question.sourceLabel} · abrir referencia",
                                     color = MaterialTheme.colorScheme.tertiary,
@@ -458,7 +523,13 @@ fun StudyScreen(initialSubjectId: String = "all") {
                         Button(
                             onClick = {
                                 submitted = true
-                                if (selectedOption == question.correctIndex) correctCount += 1
+                                val answerWasCorrect = selectedOption == question.correctIndex
+                                if (answerWasCorrect) correctCount += 1
+                                if (voiceReady && voicePreferences.enabled && voicePreferences.readFeedback) {
+                                    professorVoice.speak(feedbackNarration(question, answerWasCorrect), voicePreferences)
+                                } else {
+                                    professorVoice.stop()
+                                }
                             },
                             enabled = selectedOption != null,
                             modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -472,6 +543,7 @@ fun StudyScreen(initialSubjectId: String = "all") {
                                     selectedOption = null
                                     submitted = false
                                 } else {
+                                    professorVoice.stop()
                                     completed = true
                                     if (!statsSaved) {
                                         ProgressStore.recordSession(context, total, correctCount)
@@ -530,17 +602,125 @@ private fun StatCard(value: String, label: String, icon: ImageVector, modifier: 
 
 @Composable
 fun SettingsScreen() {
+    val context = LocalContext.current
+    var voicePreferences by remember(context) { mutableStateOf(VoicePreferencesStore.load(context)) }
+    var voiceReady by remember { mutableStateOf(false) }
+    var voiceStatus by remember { mutableStateOf("Preparando el motor de voz de Android…") }
+    val professorVoice = remember(context) {
+        ProfessorVoice(context) { ready, message ->
+            voiceReady = ready
+            voiceStatus = message
+        }
+    }
+    DisposableEffect(professorVoice) {
+        onDispose { professorVoice.shutdown() }
+    }
+
+    fun updateVoicePreferences(updated: VoicePreferences) {
+        voicePreferences = updated
+        VoicePreferencesStore.save(context, updated)
+    }
+
     ScreenFrame {
-        ScreenTitle("Configuración", "Prepara tu experiencia de estudio.")
-        SettingsRow(Icons.Outlined.Headphones, "Narración de preguntas", "Se implementará en la Fase 3")
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+        ScreenTitle("Configuración", "Ajusta la voz y la experiencia de estudio.")
+        Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconTile(Icons.Outlined.Headphones)
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("El profesor", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        Text("Narración local con el motor de voz instalado en Android.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Narración activada", fontWeight = FontWeight.SemiBold)
+                        Text("Permite que el profesor hable durante el estudio.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = voicePreferences.enabled, onCheckedChange = {
+                        updateVoicePreferences(voicePreferences.copy(enabled = it))
+                        if (!it) professorVoice.stop()
+                    })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Leer preguntas automáticamente", fontWeight = FontWeight.SemiBold)
+                        Text("Lee el enunciado y sus cuatro opciones al aparecer.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(
+                        checked = voicePreferences.autoReadQuestions,
+                        onCheckedChange = { updateVoicePreferences(voicePreferences.copy(autoReadQuestions = it)) },
+                        enabled = voicePreferences.enabled
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Leer correcciones", fontWeight = FontWeight.SemiBold)
+                        Text("Pronuncia el veredicto y la explicación después de responder.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(
+                        checked = voicePreferences.readFeedback,
+                        onCheckedChange = { updateVoicePreferences(voicePreferences.copy(readFeedback = it)) },
+                        enabled = voicePreferences.enabled
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Velocidad · ${String.format(java.util.Locale.getDefault(), "%.2f", voicePreferences.speechRate)}×", fontWeight = FontWeight.SemiBold)
+                    Slider(
+                        value = voicePreferences.speechRate,
+                        onValueChange = { updateVoicePreferences(voicePreferences.copy(speechRate = it)) },
+                        valueRange = 0.75f..1.25f,
+                        enabled = voicePreferences.enabled
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Tono · ${String.format(java.util.Locale.getDefault(), "%.2f", voicePreferences.pitch)}", fontWeight = FontWeight.SemiBold)
+                    Slider(
+                        value = voicePreferences.pitch,
+                        onValueChange = { updateVoicePreferences(voicePreferences.copy(pitch = it)) },
+                        valueRange = 0.75f..1.25f,
+                        enabled = voicePreferences.enabled
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Button(
+                        onClick = {
+                            professorVoice.speak(
+                                "Atención, genio. Soy el profesor. Abre bien esos oídos: aquí venimos a aprender medicina, no a adivinar respuestas.",
+                                voicePreferences
+                            )
+                        },
+                        enabled = voiceReady && voicePreferences.enabled,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(13.dp)
+                    ) { Text("Probar al profesor") }
+                    OutlinedButton(onClick = { professorVoice.stop() }, enabled = voiceReady, shape = RoundedCornerShape(13.dp)) {
+                        Text("Detener")
+                    }
+                }
+                Text(
+                    voiceStatus,
+                    color = if (voiceReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Text(
+                    "La aplicación no contrata ni incorpora una voz propia. Usa el idioma, la voz y el motor configurados en tu teléfono; puedes instalar voces en Ajustes de Android → Texto a voz.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        SectionLabel("Próximas funciones")
         SettingsRow(Icons.Outlined.Mic, "Reconocimiento de voz", "Entrada hablada: Fase 4")
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        SettingsRow(Icons.Outlined.AutoAwesome, "Personalidad del profesor", "Humor y correcciones contextuales: Fase 6")
+        SettingsRow(Icons.Outlined.AutoAwesome, "Respuestas abiertas", "Evaluación de respuestas habladas: Fase 5")
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        SettingsRow(Icons.Outlined.School, "Nivel académico", "El banco inicial contiene preguntas básicas, intermedias y avanzadas")
+        SettingsRow(Icons.Outlined.School, "Personalidad del profesor", "Textos gruñones y sarcásticos integrados en la narración; sin IA externa")
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        SettingsRow(Icons.Outlined.Info, "Acerca de", "Medicine Master · versión 0.2.0")
+        SettingsRow(Icons.Outlined.Info, "Acerca de", "Medicine Master · versión 0.3.0 · Fase 3")
         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = CardShape) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Importante", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
@@ -548,6 +728,32 @@ fun SettingsScreen() {
             }
         }
     }
+}
+
+private fun questionNarration(question: StudyQuestion): String {
+    val opening = when (Math.floorMod(question.id.hashCode(), 4)) {
+        0 -> "Atención, incompetente. El profesor va a hablar; intenta seguir el ritmo"
+        1 -> "A ver, lumbrera de pacotilla. Piensa antes de tocar la pantalla"
+        2 -> "Silencio, criatura. No me hagas perder la paciencia"
+        else -> "Vamos a comprobar si tu cerebro hoy ha venido a trabajar. Escucha"
+    }
+    val options = question.options.mapIndexed { index, option -> "Opción ${'A' + index}: $option" }.joinToString(". ")
+    return "$opening. ${question.prompt}. $options. Tómate un segundo y piensa antes de contestar."
+}
+
+private fun feedbackNarration(question: StudyQuestion, correct: Boolean): String {
+    return if (correct) {
+        "Correcto. Por fin una neurona ha decidido presentarse a trabajar. No te acostumbres a mis elogios. " +
+            "La respuesta es ${question.options[question.correctIndex]}. ${question.explanation}"
+    } else {
+        "Incorrecto. Qué barbaridad, genio. Hasta una planta con bata habría sospechado eso. La respuesta correcta es ${question.options[question.correctIndex]}. " +
+            question.explanation
+    }
+}
+
+private fun explanationNarration(question: StudyQuestion, correct: Boolean): String {
+    val opening = if (correct) "Escucha la explicación y trata de recordarla; mi brillante enseñanza merece atención" else "Presta atención, que esta vez te hace mucha falta, criatura."
+    return "$opening. La respuesta correcta es ${question.options[question.correctIndex]}. ${question.explanation}"
 }
 
 @Composable
