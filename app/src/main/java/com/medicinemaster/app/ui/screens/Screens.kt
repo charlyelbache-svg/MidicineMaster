@@ -1,13 +1,7 @@
 package com.medicinemaster.app.ui.screens
 
-import android.Manifest
-import android.app.Activity
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.speech.RecognizerIntent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -77,7 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medicinemaster.app.audio.ProfessorVoice
-import com.medicinemaster.app.audio.SpeechAnswerMatcher
+import com.medicinemaster.app.audio.ProfessorDialogue
 import com.medicinemaster.app.audio.VoicePreferences
 import com.medicinemaster.app.audio.VoicePreferencesStore
 import com.medicinemaster.app.data.ProgressStore
@@ -187,7 +181,7 @@ fun HomeScreen(
 
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Text("Aprende. Recuerda.\nDemuestra lo que sabes.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, lineHeight = 36.sp)
-            Text("36 preguntas iniciales con explicaciones, narración del profesor y respuestas por voz.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("126 preguntas con explicaciones, fuentes y narración del profesor.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         Card(shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
@@ -213,7 +207,7 @@ fun HomeScreen(
 
         SectionLabel("Explora la aplicación")
         Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            ActionTile(Icons.Outlined.MenuBook, "Materias", "Seis asignaturas con preguntas iniciales", onOpenSubjects)
+            ActionTile(Icons.Outlined.MenuBook, "Materias", "Seis asignaturas con banco ampliado", onOpenSubjects)
             ActionTile(Icons.Outlined.Quiz, "Sesión de estudio", "Practica y recibe explicaciones", onOpenStudy)
             ActionTile(Icons.Outlined.TrendingUp, "Mi progreso", "Consulta tus sesiones y aciertos", onOpenProgress)
         }
@@ -311,73 +305,6 @@ fun StudyScreen(initialSubjectId: String = "all") {
     val matchingQuestions = QuestionBank.forFilters(selectedSubject, selectedTopic, selectedDifficulty)
     val availableTopics = listOf("Todos los temas") + QuestionBank.topicsFor(selectedSubject)
     val questionBeingPresented = sessionQuestions.getOrNull(questionIndex)
-    var recognizedSpeech by rememberSaveable { mutableStateOf("") }
-    var speechStatus by rememberSaveable { mutableStateOf("Puedes decir la letra, el número o el texto de una opción.") }
-
-    val speechRecognitionIntent = remember {
-        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-ES")
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es-ES")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Di la letra, el número o el texto de tu respuesta")
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-        }
-    }
-
-    val speechRecognitionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val candidates = result.data
-                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                .orEmpty()
-            val transcript = candidates.firstOrNull().orEmpty()
-            recognizedSpeech = transcript
-            val options = questionBeingPresented?.options.orEmpty()
-            val matchedIndex = candidates
-                .mapNotNull { candidate -> SpeechAnswerMatcher.match(candidate, options) }
-                .firstOrNull()
-
-            if (transcript.isBlank()) {
-                speechStatus = "No pude reconocer palabras. Inténtalo otra vez o selecciona una opción."
-            } else if (matchedIndex != null && !submitted) {
-                selectedOption = matchedIndex
-                speechStatus = "He marcado la opción ${'A' + matchedIndex}. Revísala antes de comprobar la respuesta."
-            } else if (submitted) {
-                speechStatus = "La pregunta ya fue comprobada. Avanza para responder la siguiente."
-            } else {
-                speechStatus = "Entendí tu voz, pero no pude asociarla con una opción. Selecciónala manualmente."
-            }
-        } else {
-            speechStatus = "Reconocimiento cancelado. Puedes intentarlo de nuevo cuando quieras."
-        }
-    }
-
-    val microphonePermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            professorVoice.stop()
-            speechStatus = "Escuchando… habla ahora."
-            runCatching { speechRecognitionLauncher.launch(speechRecognitionIntent) }
-                .onFailure { speechStatus = "No se pudo abrir el reconocimiento de voz en este dispositivo." }
-        } else {
-            speechStatus = "Permiso de micrófono denegado. Puedes activarlo en los ajustes de la aplicación."
-        }
-    }
-
-    fun startSpeechRecognition() {
-        recognizedSpeech = ""
-        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            professorVoice.stop()
-            speechStatus = "Escuchando… habla ahora."
-            runCatching { speechRecognitionLauncher.launch(speechRecognitionIntent) }
-                .onFailure { speechStatus = "No se encontró un servicio de reconocimiento de voz disponible." }
-        } else {
-            microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
-    }
 
     LaunchedEffect(
         questionBeingPresented?.id,
@@ -402,8 +329,6 @@ fun StudyScreen(initialSubjectId: String = "all") {
         correctCount = 0
         completed = false
         statsSaved = false
-        recognizedSpeech = ""
-        speechStatus = "Puedes decir la letra, el número o el texto de una opción."
     }
 
     ScreenFrame {
@@ -433,7 +358,7 @@ fun StudyScreen(initialSubjectId: String = "all") {
 
             SectionLabel("4. Número de preguntas")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(5, 10, 15, 20).forEach { amount ->
+                listOf(5, 10, 20, 50, 100, 150).forEach { amount ->
                     FilterChip(selected = selectedCount == amount, onClick = { selectedCount = amount }, label = { Text(amount.toString()) })
                 }
             }
@@ -455,8 +380,6 @@ fun StudyScreen(initialSubjectId: String = "all") {
                             correctCount = 0
                             completed = false
                             statsSaved = false
-                            recognizedSpeech = ""
-                            speechStatus = "Puedes decir la letra, el número o el texto de una opción."
                         },
                         enabled = matchingQuestions.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -518,37 +441,6 @@ fun StudyScreen(initialSubjectId: String = "all") {
             }
             if (!voiceReady) {
                 Text(voiceStatus, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-            }
-
-            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(modifier = Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        androidx.compose.material3.Icon(Icons.Outlined.Mic, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("Responder hablando", fontWeight = FontWeight.Bold)
-                            Text("Di «opción B», «la segunda» o lee la respuesta.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    OutlinedButton(
-                        onClick = { startSpeechRecognition() },
-                        enabled = !submitted,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        androidx.compose.material3.Icon(Icons.Outlined.Mic, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Hablar respuesta")
-                    }
-                    if (recognizedSpeech.isNotBlank()) {
-                        Text("Te entendí: «$recognizedSpeech»", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    }
-                    Text(speechStatus, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-                    Text(
-                        "Usa el reconocedor disponible en Android; algunos motores pueden necesitar conexión a Internet.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
             }
 
             Card(shape = RoundedCornerShape(25.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -651,8 +543,6 @@ fun StudyScreen(initialSubjectId: String = "all") {
                                     questionIndex += 1
                                     selectedOption = null
                                     submitted = false
-                                    recognizedSpeech = ""
-                                    speechStatus = "Puedes decir la letra, el número o el texto de una opción."
                                 } else {
                                     professorVoice.stop()
                                     completed = true
@@ -782,7 +672,7 @@ fun SettingsScreen() {
                     Slider(
                         value = voicePreferences.speechRate,
                         onValueChange = { updateVoicePreferences(voicePreferences.copy(speechRate = it)) },
-                        valueRange = 0.75f..1.25f,
+                        valueRange = 0.85f..1.15f,
                         enabled = voicePreferences.enabled
                     )
                 }
@@ -791,7 +681,7 @@ fun SettingsScreen() {
                     Slider(
                         value = voicePreferences.pitch,
                         onValueChange = { updateVoicePreferences(voicePreferences.copy(pitch = it)) },
-                        valueRange = 0.75f..1.25f,
+                        valueRange = 0.95f..1.05f,
                         enabled = voicePreferences.enabled
                     )
                 }
@@ -799,7 +689,7 @@ fun SettingsScreen() {
                     Button(
                         onClick = {
                             professorVoice.speak(
-                                "Atención, genio. Soy el profesor. Abre bien esos oídos: aquí venimos a aprender medicina, no a adivinar respuestas.",
+                                ProfessorDialogue.settingsTest(),
                                 voicePreferences
                             )
                         },
@@ -817,21 +707,21 @@ fun SettingsScreen() {
                     style = MaterialTheme.typography.labelSmall
                 )
                 Text(
-                    "La aplicación no contrata ni incorpora una voz propia. Usa el idioma, la voz y el motor configurados en tu teléfono; puedes instalar voces en Ajustes de Android → Texto a voz.",
+                    "La aplicación utiliza el motor instalado en Android y selecciona la mejor voz española disponible. Para mejorar el sonido, instala una voz española de alta calidad en Ajustes → Administración general → Texto a voz.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
         }
 
-        SectionLabel("Funciones y próximas fases")
-        SettingsRow(Icons.Outlined.Mic, "Reconocimiento de voz", "Fase 4 activa: dicta letras, números o el texto de una opción")
+        SectionLabel("Próximas funciones")
+        SettingsRow(Icons.Outlined.Mic, "Reconocimiento de voz", "En pausa; esta versión se centra en el banco de preguntas y la narración")
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        SettingsRow(Icons.Outlined.AutoAwesome, "Respuestas abiertas", "Próxima fase: evaluación de respuestas libres · Fase 5")
+        SettingsRow(Icons.Outlined.AutoAwesome, "Respuestas abiertas", "Evaluación de respuestas habladas: Fase 5")
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         SettingsRow(Icons.Outlined.School, "Personalidad del profesor", "Textos gruñones y sarcásticos integrados en la narración; sin IA externa")
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        SettingsRow(Icons.Outlined.Info, "Acerca de", "Medicine Master · versión 0.4.0 · Fase 4")
+        SettingsRow(Icons.Outlined.Info, "Acerca de", "Medicine Master · versión 0.5.0 · banco ampliado y profesor sarcástico")
         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = CardShape) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Importante", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
@@ -841,31 +731,13 @@ fun SettingsScreen() {
     }
 }
 
-private fun questionNarration(question: StudyQuestion): String {
-    val opening = when (Math.floorMod(question.id.hashCode(), 4)) {
-        0 -> "Atención, incompetente. El profesor va a hablar; intenta seguir el ritmo"
-        1 -> "A ver, lumbrera de pacotilla. Piensa antes de tocar la pantalla"
-        2 -> "Silencio, criatura. No me hagas perder la paciencia"
-        else -> "Vamos a comprobar si tu cerebro hoy ha venido a trabajar. Escucha"
-    }
-    val options = question.options.mapIndexed { index, option -> "Opción ${'A' + index}: $option" }.joinToString(". ")
-    return "$opening. ${question.prompt}. $options. Tómate un segundo y piensa antes de contestar."
-}
+private fun questionNarration(question: StudyQuestion): String = ProfessorDialogue.question(question)
 
-private fun feedbackNarration(question: StudyQuestion, correct: Boolean): String {
-    return if (correct) {
-        "Correcto. Por fin una neurona ha decidido presentarse a trabajar. No te acostumbres a mis elogios. " +
-            "La respuesta es ${question.options[question.correctIndex]}. ${question.explanation}"
-    } else {
-        "Incorrecto. Qué barbaridad, genio. Hasta una planta con bata habría sospechado eso. La respuesta correcta es ${question.options[question.correctIndex]}. " +
-            question.explanation
-    }
-}
+private fun feedbackNarration(question: StudyQuestion, correct: Boolean): String =
+    ProfessorDialogue.feedback(question, correct)
 
-private fun explanationNarration(question: StudyQuestion, correct: Boolean): String {
-    val opening = if (correct) "Escucha la explicación y trata de recordarla; mi brillante enseñanza merece atención" else "Presta atención, que esta vez te hace mucha falta, criatura."
-    return "$opening. La respuesta correcta es ${question.options[question.correctIndex]}. ${question.explanation}"
-}
+private fun explanationNarration(question: StudyQuestion, correct: Boolean): String =
+    ProfessorDialogue.explanation(question, correct)
 
 @Composable
 private fun SettingsRow(icon: ImageVector, title: String, detail: String) {
