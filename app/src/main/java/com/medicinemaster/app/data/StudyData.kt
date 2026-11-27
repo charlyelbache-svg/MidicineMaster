@@ -124,7 +124,7 @@ object QuestionBank {
         q("bio-004", StudySubjects.BIOCHEMISTRY, "Bioquímica", "Metabolismo", "¿Qué describe una ruta anabólica?", listOf("La degradación de moléculas complejas", "La síntesis de moléculas complejas a partir de otras más simples", "La destrucción de todos los ATP", "La difusión de gases"), 1, "Avanzada", "El anabolismo construye moléculas complejas desde componentes más simples y requiere aporte de energía.", OPENSTAX_BIO, METABOLISM),
         q("bio-005", StudySubjects.BIOCHEMISTRY, "Bioquímica", "Proteínas", "¿Cuáles son las unidades básicas que forman las proteínas?", listOf("Ácidos grasos", "Aminoácidos", "Monosacáridos", "Nucleótidos"), 1, "Básica", "Las proteínas son polímeros cuyos monómeros son aminoácidos unidos mediante enlaces peptídicos.", OPENSTAX_BIO, PROTEINS),
         q("bio-006", StudySubjects.BIOCHEMISTRY, "Bioquímica", "Ácidos nucleicos", "¿Cuál es la unidad estructural básica de los ácidos nucleicos?", listOf("Aminoácido", "Nucleótido", "Triglicérido", "Glucógeno"), 1, "Intermedia", "El ADN y el ARN son polímeros construidos a partir de nucleótidos.", OPENSTAX_BIO, NUCLEIC_ACIDS)
-    )
+    ) + ExpandedQuestionBank.questions
 
     fun forFilters(subjectId: String, topic: String, difficulty: String): List<StudyQuestion> {
         return questions.filter { question ->
